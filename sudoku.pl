@@ -20,6 +20,12 @@ my ($board, $free) = init($puzzle);
 my @stack;
 my @not_allowed = ();
 my %bad = ();
+
+my $prev;
+my $current = {
+    prev => $prev,
+};
+
 #p %board;
 
 
@@ -27,34 +33,58 @@ my %bad = ();
 while (my $rpos = pop @{$free}) {
 
     my $found = 0;
+
     VALUE:
     foreach my $x (1..9) {
-        next VALUE if grep($x == $_, @not_allowed) || grep($x==$_, @{$bad{$rpos}});
+        next if exists $current->{next}->{$x} and $current->{next}->{$x} == -1;
         if (is_allowed($x, $rpos, $board)) {
-            push @stack, [$x, $rpos, $board];
+            say "ok pos: $rpos, value: $x";
+            $current->{pos} = $rpos;
             $board->{$rpos} = $x;
-            say $rpos;
-            say $x;
+#            print p $current;
             $found = 1;
-            last;
+
+            $prev = $current;
+            $current = {
+                prev => $prev,
+            };
+            $prev->{next}->{$x} = $current;
+            last VALUE;
+        } else {
+            $current->{next}->{$x} = -1;
         }
     }
 
     unless ($found) {
-        say $rpos;
+        say "pos: $rpos";
         say 'back';
+        # print p $current;
+
         $DB::single=1;
+        $board->{$rpos} = 0;
+
+
+        if ($prev) {
+            BAD:
+            for my $bad (keys %{$prev->{next}}) {
+                if ( scalar $current == scalar $prev->{next}->{$bad} ) {
+                    $prev->{next}->{$bad} = -1;
+                    say "bad: $bad";
+                    last BAD;
+                }
+            }
+            $current = $prev;
+        } else {
+            say 'idontknow';
+        }
         push @{$free}, $rpos;
-        my $prev = pop @stack;
-        push @not_allowed, $prev->[0];
-        (undef, $rpos, $board) = @{$prev};
-        push @{$bad{$rpos}}, $prev->[0];
+        $rpos = $current->{pos};
+        $prev = $current->{prev};
+
         goto VALUE;
     }
-    show($board) unless $found;
 
-    @not_allowed = ();
-#    delete $free->[$rpos];
+    show($board) unless $found;
 }
 
 show($board);
